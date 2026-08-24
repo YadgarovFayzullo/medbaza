@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /*
+     * The sticky header's height, for anything that has to sit clear of it.
+     * The header is sticky rather than fixed, so it overlays content once the
+     * page scrolls and a sticky sidebar underneath it needs this offset.
+     *
+     * Two rows: service bar 29px (py-1.5 + text-xs + border) and main bar 62px
+     * (py-2.5 + the 42px search input), plus the header's own bottom border.
+     * Rounded up a little, so a change in the header shows as a small gap
+     * rather than a clipped panel. Change it here, not at the call site.
+     */
+    --header-offset: 6rem;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white font-sans text-base text-accent antialiased;
+  }
+
+  /*
+   * Medium, not semibold: Helvetica Neue ships no 600 weight, so 600 is
+   * rounded up to Bold and a heading reads far heavier than intended. Size
+   * and spacing carry the hierarchy at these sizes anyway (§9).
+   */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-medium tracking-tight text-accent;
+    text-wrap: balance;
+  }
+
+  /* Every interactive element gets a visible, non-shadow focus state (§9). */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-primary-ink ring-offset-2 ring-offset-white;
+  }
+
+  ::selection {
+    @apply bg-primary/15;
+  }
+}
+
+@layer components {
+  /* The page is white, so a surface is told apart by its hairline border
+     alone — never by a shadow (§9). */
+  .surface {
+    @apply rounded-lg border border-accent/10 bg-white;
+  }
+
+  /* The recessed counterpart: wells, placeholders, and icon plates. */
+  .well {
+    @apply rounded-lg bg-base;
+  }
+
+  .divider {
+    @apply border-accent/10;
+  }
+}

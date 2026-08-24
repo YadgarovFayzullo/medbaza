@@ -1,0 +1,30 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "prettier"
+  ],
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value=/^#[0-9a-fA-F]{3,8}$/]",
+        "message": "Use a Tailwind token from tailwind.config.ts \u2014 no hardcoded colours (CLAUDE.md \u00a79)."
+      },
+      {
+        "selector": "Literal[value=/(^|\\s|:)(shadow-(?!card\\b)|drop-shadow|bg-gradient-)/]",
+        "message": "No shadows and no gradients (CLAUDE.md \u00a79). `shadow-card` on a card hover is the one exception; otherwise use border-accent/10 or a background step."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "lib/design-tokens.ts",
+        "tailwind.config.ts"
+      ],
+      "rules": {
+        "no-restricted-syntax": "off"
+      }
+    }
+  ]
+}
