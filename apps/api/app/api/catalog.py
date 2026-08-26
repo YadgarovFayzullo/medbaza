@@ -98,7 +98,9 @@ async def suggest(
 async def get_product(slug: str, session: DbSession) -> ProductRead:
     """Full product detail, including specs, certifications, and seller."""
     product = await catalog_service.get_product_by_slug(session, slug)
-    return ProductRead.model_validate(product)
+    return ProductRead.model_validate(product).model_copy(
+        update={"buyers_last_7d": await catalog_service.buyers_in_last_week(session, product.id)}
+    )
 
 
 @router.get(

@@ -16,6 +16,7 @@ ROUTES: dict[str, str] = {
     outbox_service.ORDER_PLACED: "send_order_confirmation",
     outbox_service.ORDER_PAID: "send_order_confirmation",
     outbox_service.PRESCRIPTION_REVIEWED: "send_prescription_decision",
+    outbox_service.PRODUCT_REINDEX: "revalidate_storefront",
 }
 
 MAX_ATTEMPTS = 5
@@ -39,6 +40,7 @@ async def dispatch_outbox(ctx: dict[str, Any]) -> int:
                     event.payload.get("order_id")
                     or event.payload.get("prescription_id")
                     or event.payload.get("shipment_id")
+                    or event.payload.get("product_id")
                 )
                 await redis.enqueue_job(job, argument)
                 await outbox_service.mark_dispatched(session, event)

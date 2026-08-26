@@ -12,7 +12,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import account, admin, auth, cart, catalog, checkout, orders, payments, prescriptions
+from app.api import (
+    account,
+    admin,
+    auth,
+    cart,
+    catalog,
+    checkout,
+    media,
+    orders,
+    payments,
+    prescriptions,
+)
 from app.api import sellers as sellers_api
 from app.core.config import settings
 from app.core.errors import AppError
@@ -157,5 +168,6 @@ for module_router in (
     sellers_api.me_router,
     payments.router,
     admin.router,
+    media.router,
 ):
     app.include_router(module_router, prefix=prefix)

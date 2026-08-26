@@ -26,9 +26,20 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     web_base_url: str = "http://localhost:3000"
+    # Shared with the web app's POST /api/revalidate, which busts the storefront's
+    # ISR tags after a catalog change. Unset disables the bust (dev convenience).
+    revalidate_secret: str = ""
 
     prescription_encryption_key: str = ""
     storage_bucket: str = "medbaza-local"
+    # Catalog photos live in their own **public** bucket, separate from the
+    # private document bucket above: they are served to anonymous shoppers on
+    # ISR-cached pages, so they cannot sit behind an expiring presigned URL.
+    image_bucket: str = "medbaza-images"
+    # The bucket's public hostname (an R2 public dev URL or a custom domain).
+    # Empty falls back to the dev media route served by the API itself.
+    image_public_base_url: str = ""
+    api_base_url: str = "http://localhost:8000"
     storage_endpoint_url: str = ""
     storage_access_key_id: str = ""
     storage_secret_access_key: str = ""

@@ -2,7 +2,7 @@
 
 import re
 import unicodedata
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Select, String, cast, func, or_, select
@@ -25,6 +25,8 @@ from app.models.order import Order, OrderItem, Shipment
 from app.models.product import Product
 from app.models.review import Review
 from app.models.seller import Seller
+from app.services import outbox_service
+from app.storage import images
 
 # Categories whose listings are regulated: a product cannot go live without at
 # least one CE / FDA / ISO certification recorded (CLAUDE.md §5.5).
@@ -34,6 +36,9 @@ from app.models.seller import Seller
 REGULATED_CATEGORY_SLUGS = frozenset({"ppe", "first-aid"})
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
+
+# A carousel, not a gallery: enough for the angles a listing needs.
+MAX_PRODUCT_IMAGES = 8
 
 
 def slugify(value: str) -> str:
@@ -347,6 +352,21 @@ def _validate_compare_at(price_minor: int, compare_at_minor: int | None) -> None
         )
 
 
+async def _publish_catalog_change(session: AsyncSession, product: Product) -> None:
+    """Queue the storefront cache bust for after this transaction commits.
+
+    Category and product pages are served from ISR, so without this a seller's
+    change is invisible until the revalidate window closes and looks like a lost
+    save. Enqueued through the outbox, never inline, because the change must not
+    be published if the transaction rolls back (§3.3, §3.6).
+    """
+    await outbox_service.emit(
+        session,
+        outbox_service.PRODUCT_REINDEX,
+        {"product_id": product.id, "slug": product.slug},
+    )
+
+
 async def create_product(session: AsyncSession, seller: Seller, payload: Any) -> Product:
     """Create a listing owned by `seller`.
 
@@ -383,6 +403,7 @@ async def create_product(session: AsyncSession, seller: Seller, payload: Any) ->
     except IntegrityError as exc:
         await session.rollback()
         raise DuplicateSkuError(details={"sku": payload.sku}) from exc
+    await _publish_catalog_change(session, product)
     return product
 
 
@@ -427,6 +448,7 @@ async def update_product(
         product.name = data["name"].strip()
 
     await session.flush()
+    await _publish_catalog_change(session, product)
     return product
 
 
@@ -436,6 +458,7 @@ async def archive_product(session: AsyncSession, seller: Seller, product_id: str
     product.status = ProductStatus.ARCHIVED
     product.archived_at = datetime.now(UTC)
     await session.flush()
+    await _publish_catalog_change(session, product)
     return product
 
 
@@ -525,3 +548,117 @@ async def create_review(
     product.rating_count += 1
     await session.flush()
     return review
+
+
+# --- product images -------------------------------------------------------
+
+
+async def add_product_image(
+    session: AsyncSession,
+    seller: Seller,
+    product_id: str,
+    *,
+    data: bytes,
+    content_type: str,
+) -> Product:
+    """Store one photo and append it to the listing's carousel.
+
+    Order is the list's order, so the first entry is the thumbnail the storefront
+    shows. Ownership is checked by `get_seller_product` (§3.5).
+    """
+    product = await get_seller_product(session, seller, product_id)
+
+    if content_type not in images.CONTENT_TYPES:
+        raise ValidationError(
+            "Faqat JPEG, PNG yoki WebP rasm yuklash mumkin.",
+            details={"content_type": content_type},
+        )
+    if not data:
+        raise ValidationError("Rasm fayli bo’sh.")
+    if len(data) > images.MAX_IMAGE_BYTES:
+        raise ValidationError(
+            "Rasm hajmi 5 MB dan oshmasligi kerak.",
+            details={"max_bytes": images.MAX_IMAGE_BYTES},
+        )
+    if len(product.images) >= MAX_PRODUCT_IMAGES:
+        raise ValidationError(
+            f"Bitta e’longa eng ko’pi {MAX_PRODUCT_IMAGES} ta rasm qo’shiladi.",
+            details={"limit": MAX_PRODUCT_IMAGES},
+        )
+
+    key = images.build_key(product.id, content_type)
+    await images.get_image_store().put(key, data, content_type)
+
+    # Reassigned rather than appended: the column is JSON, and SQLAlchemy does
+    # not track in-place mutation of a plain list.
+    product.images = [*product.images, key]
+    await session.flush()
+    await _publish_catalog_change(session, product)
+    return product
+
+
+async def delete_product_image(
+    session: AsyncSession, seller: Seller, product_id: str, key: str
+) -> Product:
+    """Drop one photo from the carousel.
+
+    The object is removed only when this store owns the key; a seeded path is
+    detached from the listing but never deleted from the web app's assets.
+    """
+    product = await get_seller_product(session, seller, product_id)
+
+    # Reads hand out resolved URLs, so a client deletes using the string it was
+    # given; the row stores the bare key. Match either form rather than making
+    # callers reverse the resolution themselves.
+    stored = next(
+        (
+            existing
+            for existing in product.images
+            if existing == key or images.resolve_url(existing) == key
+        ),
+        None,
+    )
+    if stored is None:
+        raise NotFoundError("Bunday rasm topilmadi.")
+
+    product.images = [existing for existing in product.images if existing != stored]
+    await session.flush()
+
+    if images.is_managed_key(stored):
+        await images.get_image_store().delete(stored)
+
+    await _publish_catalog_change(session, product)
+    return product
+
+
+# The window the storefront's "bought recently" line reports on.
+PURCHASE_WINDOW_DAYS = 7
+
+
+async def buyers_in_last_week(session: AsyncSession, product_id: str) -> int:
+    """How many distinct buyers ordered this listing in the last week.
+
+    Counts people, not lines: two orders from one buyer is one buyer. Only
+    shipments that were actually paid for count — a basket that never settled
+    is not a purchase. Derived on read, never stored.
+    """
+    since = datetime.now(UTC) - timedelta(days=PURCHASE_WINDOW_DAYS)
+    result = await session.execute(
+        select(func.count(func.distinct(Order.buyer_id)))
+        .select_from(OrderItem)
+        .join(Shipment, Shipment.id == OrderItem.shipment_id)
+        .join(Order, Order.id == Shipment.order_id)
+        .where(
+            OrderItem.product_id == product_id,
+            OrderItem.created_at >= since,
+            Shipment.status.in_(
+                [
+                    ShipmentStatus.PAID,
+                    ShipmentStatus.PROCESSING,
+                    ShipmentStatus.SHIPPED,
+                    ShipmentStatus.DELIVERED,
+                ]
+            ),
+        )
+    )
+    return int(result.scalar_one() or 0)

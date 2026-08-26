@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, File, Query, UploadFile, status
 
 from app.api.deps import Cursor, Limit, Transaction
 from app.auth import CurrentSeller, CurrentUser, DbSession
@@ -158,6 +158,51 @@ async def archive_my_product(
 ) -> ProductRead:
     """Archive a listing. Listings that have been ordered are never hard-deleted."""
     product = await catalog_service.archive_product(session, seller, product_id)
+    await session.refresh(product, ["category", "seller"])
+    return ProductRead.model_validate(product)
+
+
+@me_router.post(
+    "/products/{product_id}/images",
+    response_model=ProductRead,
+    status_code=status.HTTP_201_CREATED,
+    operation_id="addMyProductImage",
+)
+async def add_my_product_image(
+    product_id: str,
+    session: DbSession,
+    seller: CurrentSeller,
+    file: Annotated[UploadFile, File()],
+) -> ProductRead:
+    """Upload one catalog photo and append it to the listing's carousel.
+
+    JPEG, PNG or WebP, up to 5 MB. The first image is the storefront thumbnail;
+    reorder by sending the whole `images` list to PATCH /seller/products/{id}.
+    """
+    product = await catalog_service.add_product_image(
+        session,
+        seller,
+        product_id,
+        data=await file.read(),
+        content_type=(file.content_type or "").lower(),
+    )
+    await session.refresh(product, ["category", "seller"])
+    return ProductRead.model_validate(product)
+
+
+@me_router.delete(
+    "/products/{product_id}/images",
+    response_model=ProductRead,
+    operation_id="deleteMyProductImage",
+)
+async def delete_my_product_image(
+    product_id: str,
+    key: Annotated[str, Query(max_length=512)],
+    session: DbSession,
+    seller: CurrentSeller,
+) -> ProductRead:
+    """Remove one photo from a listing, deleting the stored object with it."""
+    product = await catalog_service.delete_product_image(session, seller, product_id, key)
     await session.refresh(product, ["category", "seller"])
     return ProductRead.model_validate(product)
 

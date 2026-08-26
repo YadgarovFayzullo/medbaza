@@ -16,7 +16,7 @@ Violating any of these fails review, regardless of what else the PR does well.
 4. **No payment-provider SDK outside `app/services/payments/adapters/`.** No provider type may appear in a model, schema, service signature, or router. See §4.
 5. **Every stock mutation happens inside the row lock described in §5.3.** No read-then-write on `Product.stock` without it.
 6. **No PHI or PII in logs, error messages, traces, or Sentry.** Prescriptions, health conditions, addresses, full names, emails: never logged. Log IDs.
-7. **Model change ⇒ Alembic migration in the same PR.** Router schema change ⇒ `pnpm generate:api` re-run in the same PR.
+7. **Model change ⇒ Alembic migration in the same PR.** Router schema change ⇒ `npm run generate:api` re-run in the same PR.
 8. **Every `services/` change ships with a test.** No exceptions for "trivial" changes.
 9. **No gradients, and exactly one shadow: `shadow-card`.** See §9 — enforced by lint and by the Tailwind theme, which defines no other shadow.
 10. **Secrets come from the environment.** Nothing resembling a key, token, or DB password is ever committed, not even in a test fixture or example.
@@ -54,7 +54,7 @@ All rows below are **settled**. Do not substitute, add an alternative, or introd
 | Styling | Tailwind CSS | Tokens only; see §9 |
 | UI primitives | shadcn/ui (Radix), restyled | Shadows stripped at the point of vendoring, not overridden later |
 | Client data | TanStack Query | Only inside Client Components; Server Components fetch directly |
-| Object storage | S3-compatible (Cloudflare R2 or S3) via `boto3` | Private buckets only; access via short-lived presigned URLs |
+| Object storage | S3-compatible (Cloudflare R2 or S3) via `boto3` | Two buckets, never one: documents private (presigned, short-lived), catalog images public — see §5.7 |
 | Search | Postgres full-text search | Revisit (Meilisearch/Typesense) only when p95 search latency exceeds 300 ms |
 | Email | Resend or Postmark, from the backend | Always enqueued as a job, never sent inline |
 | Backend tests | pytest, pytest-asyncio, httpx | See §11 |
@@ -106,7 +106,7 @@ tests/unit/test_x_service.py
 tests/integration/test_x_api.py
 ```
 
-Then register the router in `app/main.py` and re-run `pnpm generate:api`.
+Then register the router in `app/main.py` and re-run `npm run generate:api`.
 
 ### 3.3 Transactions and the unit of work
 
@@ -188,9 +188,10 @@ class PaymentProvider(Protocol):
 - Data flows down as props. React Context is permitted for exactly three things: auth/session, cart, and saved items. Anything else needs a reason in the PR description.
 - **Saved items** are client-only: a list of product slugs in `localStorage`, resolved against the public product endpoint so price and stock are always live. There is no wishlist resource on the API. The `localStorage` ban in this section is about the access token — non-sensitive UI state is fine there, but nothing identifying a person or a purchase goes in it.
 - A **guest cart** is identified by an opaque token the API mints and returns in the `X-Cart-Token` response header. The browser keeps it in a readable (non-httpOnly) cookie and sends it back on every cart call; signing in merges it into the account's cart. It is a basket id, not a credential.
-- A layout that needs the current path for active-nav marking reads the `x-pathname` header set by `middleware.ts`, rather than turning the whole navigation rail into a Client Component.
+- Active-nav marking lives in one Client Component leaf, `components/domain/nav-links.tsx`, which reads `usePathname()`. It is the only client part of a dashboard shell — the header, the account menu, and the page stay server-rendered. Do not read the path on the server for this: a layout is **not** re-rendered when the router moves between its child pages, so a path captured during the first render sticks and the highlight trails one navigation behind. (This replaces an earlier `x-pathname` header set by `middleware.ts`, which was removed for exactly that reason.)
+- A rail whose first item is the section index (`/seller`, `/account`, `/admin`) must mark the **most specific** match only. That href prefixes every sibling, so a plain `startsWith` lights two rows at once on any nested page.
 - Product and category pages use ISR with tag-based revalidation; cart, checkout, and every dashboard route are dynamic and never cached.
-- Tags are declared in `CACHE_TAGS` (`lib/api-client/endpoints.ts`) and busted through `POST /api/revalidate`, guarded by `REVALIDATE_SECRET`. A time window on its own is not a cache strategy — without a tag there is no way to publish a catalog change before the window closes, and a stale page looks exactly like a bug.
+- Tags are declared in `CACHE_TAGS` (`lib/api-client/endpoints.ts`) and busted through `POST /api/revalidate`, guarded by `REVALIDATE_SECRET`. **Every catalog mutation must bust them**: `catalog_service` emits a `PRODUCT_REINDEX` outbox event, and the `revalidate_storefront` job calls that endpoint after the transaction commits (§3.6). A mutation that skips this leaves the seller staring at their own change not appearing, which reads as a lost save, not as a cache. A time window on its own is not a cache strategy — without a tag there is no way to publish a catalog change before the window closes, and a stale page looks exactly like a bug.
 - An endpoint helper may supply a caching *default*, never an override. Caller options win; spreading `next` after `...options` silently ignores what the caller asked for and collides with `cache: 'no-store'`.
 - Cart mutations are optimistic and reconciled against the server response; the server is authoritative on price and stock, always.
 - The access token never touches `localStorage`. Refresh tokens are httpOnly cookies.
@@ -313,6 +314,37 @@ paid|processing|shipped|delivered ──▶ refunded   (partial or full)
 - Never trust amounts from a webhook without comparing them to the stored order total.
 
 ---
+
+### 5.7 Catalog images
+
+Product photos are the one thing in this system stored **publicly**. Everything
+else in object storage — prescriptions above all — stays private, encrypted, and
+reachable only through an expiring presigned URL (§5.5, §12.2).
+
+**Rules**
+
+- Two buckets, never one. `STORAGE_BUCKET` holds documents and is private;
+  `IMAGE_BUCKET` holds catalog photos and is public. `app/storage/images.py` is
+  the only module that touches the image bucket, and it never handles a
+  prescription key.
+- A photo is public because it has to be: the storefront serves it to anonymous
+  shoppers on ISR-cached pages, and a URL that expires in minutes would make
+  those pages uncacheable and break every CDN in front of them.
+- Nothing identifying goes in an image key. Keys are
+  `products/<product_id>/<uuid>.<ext>` — no seller name, no filename the
+  uploader chose.
+- Accepted types are JPEG, PNG, and WebP, at most 5 MB, at most
+  `MAX_PRODUCT_IMAGES` per listing. **SVG is never accepted**: it is a
+  script-bearing document served from our own origin, not a photo.
+- `Product.images` is an ordered list and the order *is* the carousel order.
+  Position 0 is the storefront thumbnail; reordering is a `PATCH` of the whole
+  list, never a separate "primary" flag.
+- Rows store a bare key; the response schema resolves it into a URL against
+  `IMAGE_PUBLIC_BASE_URL`, so the bucket's hostname lives in configuration
+  rather than being baked into every row. Seeded `/path` values and absolute
+  URLs pass through untouched.
+- Deleting a photo removes the stored object only when the key belongs to our
+  image store, so a seeded asset is detached without being deleted.
 
 ## 6. API conventions
 
@@ -519,6 +551,9 @@ volumes:
 | `JWT_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Auth |
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Object storage |
 | `PRESCRIPTION_ENCRYPTION_KEY` | At-rest encryption for sensitive uploads |
+| `IMAGE_BUCKET`, `IMAGE_PUBLIC_BASE_URL` | Public catalog-image bucket and its hostname (§5.7). Empty hostname falls back to the API's dev media route |
+| `API_BASE_URL` | Used to build that dev fallback URL |
+| `REVALIDATE_SECRET` | Shared with the web app's `POST /api/revalidate`; must match `apps/web/.env.local`. Empty disables the storefront cache bust |
 | `PAYMENT_PROVIDER` | `fake` until §4 is decided |
 | `EMAIL_API_KEY`, `EMAIL_FROM` | Transactional email |
 | `SENTRY_DSN`, `ENVIRONMENT`, `LOG_LEVEL` | Observability |
@@ -551,18 +586,18 @@ ruff check . && black --check . && mypy app    # lint + types
 **Frontend (`apps/web`)**
 
 ```bash
-pnpm dev            # dev server
-pnpm build          # production build
-pnpm lint           # eslint
-pnpm typecheck      # tsc --noEmit
-pnpm test           # vitest
-pnpm generate:api   # regenerate the typed client from the backend OpenAPI schema
+npm run dev            # dev server
+npm run build          # production build
+npm run lint           # eslint
+npm run typecheck      # tsc --noEmit
+npm test               # vitest
+npm run generate:api   # regenerate the typed client from the backend OpenAPI schema
 ```
 
 **E2E (repo root)**
 
 ```bash
-pnpm test:e2e       # playwright against local web + api
+npm run test:e2e       # playwright against local web + api
 ```
 
 ---
@@ -623,7 +658,7 @@ Written for: prescription view/download, prescription review decision, seller ve
 - [ ] Lint, format, and type checks pass on both apps
 - [ ] `pytest` passes, including a new test for the changed behavior
 - [ ] Model change → Alembic migration in this PR, and `alembic downgrade -1` was actually run and works
-- [ ] Router schema change → `pnpm generate:api` re-run, generated diff committed
+- [ ] Router schema change → `npm run generate:api` re-run, generated diff committed
 - [ ] New settings → added to `.env.example`
 - [ ] New error code → added to the handler map and used by the frontend
 - [ ] New endpoint → authorization test for the wrong role and the wrong owner

@@ -10,6 +10,7 @@ from arq.cron import cron
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.workers.tasks.catalog import revalidate_storefront
 from app.workers.tasks.email import send_order_confirmation, send_prescription_decision
 from app.workers.tasks.outbox import dispatch_outbox
 
@@ -19,7 +20,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    functions = [send_order_confirmation, send_prescription_decision]
+    functions = [send_order_confirmation, send_prescription_decision, revalidate_storefront]
     cron_jobs = [cron(dispatch_outbox, second={0, 10, 20, 30, 40, 50}, run_at_startup=True)]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup

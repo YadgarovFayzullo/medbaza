@@ -3,10 +3,11 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.money import DEFAULT_CURRENCY
 from app.models.enums import Certification, ProductStatus
+from app.storage import images
 
 if TYPE_CHECKING:
     from app.models.review import Review
@@ -71,11 +72,26 @@ class ProductListItem(BaseModel):
     seller: SellerSummary
     category_id: str
 
+    @field_validator("image_url")
+    @classmethod
+    def _resolve_image_url(cls, value: str | None) -> str | None:
+        """Rows store a bucket key; a client needs a URL it can fetch."""
+        return None if value is None else images.resolve_url(value)
+
 
 class ProductRead(ProductListItem):
     description: str
     sku: str
+    # Distinct buyers over the last week, derived on read (never stored). Zero
+    # is a real answer, not a missing value.
+    buyers_last_7d: int = 0
     images: list[str]
+
+    @field_validator("images")
+    @classmethod
+    def _resolve_images(cls, value: list[str]) -> list[str]:
+        return [images.resolve_url(item) for item in value]
+
     specs: dict[str, Any]
     status: str
     category: CategoryRead
