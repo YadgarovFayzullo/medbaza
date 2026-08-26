@@ -438,12 +438,20 @@ Defined once in `apps/web/lib/design-tokens.ts`; `tailwind.config.ts` builds its
 ```ts
 // apps/web/lib/design-tokens.ts
 export const palette = {
-  base:           '#F7F8F9',  // background / neutral
+  base:           '#F7F8F9',  // recessed fill — backgrounds only, never text (see below)
   primary:        '#0096C7',  // medical blue — fills, active states, tints
   'primary-ink':  '#0077A3',  // the readable shade of primary — see below
   accent:         '#1B2430',  // dark navy/charcoal — headings, body text, emphasis
 };
 ```
+
+`base` is wired into `theme.extend.backgroundColor`, **not** into `colors`.
+Tailwind's font-size scale already owns the name `base`, so a colour of the same
+name generates a second `.text-base` rule that lands after `.text-accent` and
+wins — every `size="lg"` button drew near-white text on a white fill and read as
+blank. `bg-base` is the only form this colour is ever used in, so it is
+published only as a background. If it ever needs to be a border or a text
+colour, rename the token rather than adding it back to `colors`.
 
 `primary-ink` is **a shade of `primary`, not a fourth hue.** It exists because the brand blue is a fill colour, not an ink one: white on `primary` is 3.39:1 and `primary` as text on white is 3.39:1, both under the 4.5:1 AA floor. The darker shade is 5.04:1 on white, so it carries anything made of text.
 

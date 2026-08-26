@@ -22,7 +22,20 @@ const config: Config = {
     // it, so `shadow-card` is the only shadow utility that compiles.
     boxShadow: shadow,
     extend: {
-      colors: palette,
+      // `base` is deliberately left out of `colors` and handed to
+      // `backgroundColor` alone.
+      //
+      // Tailwind's font-size scale already owns the name `base`, so putting the
+      // colour in `colors` generates a second `.text-base` rule — a colour one
+      // — that lands after `.text-accent` in the sheet and wins. Every
+      // `size="lg"` button then drew near-white text on a white fill and read
+      // as blank. `base` is only ever a fill (§9), so this costs nothing.
+      colors: {
+        primary: palette.primary,
+        'primary-ink': palette['primary-ink'],
+        accent: palette.accent,
+      },
+      backgroundColor: { base: palette.base },
       borderRadius: {
         // One radius project-wide. `rounded-full` stays available for avatars
         // and pills. Every key maps to it so `rounded-md`/`sm` cannot drift.
