@@ -34,15 +34,16 @@ export async function SiteHeader() {
           <span className="hidden text-lg sm:inline">MedBaza</span>
         </Link>
 
-        {/* Reachable on a phone too: the catalog is the primary way through the
-            shop, and §9 does not allow a viewport to hide a destination. */}
-        <div className="order-2 shrink-0">
+        {/* Hidden on a phone because the tab bar carries it there. Every
+            destination stays reachable at every width (§9) — just from a
+            different place. */}
+        <div className="order-2 hidden shrink-0 sm:block">
           <CatalogMenu categories={categories} />
         </div>
 
         <nav
           aria-label="Hisob, saralanganlar va savat"
-          className="order-3 ml-auto flex shrink-0 items-center gap-1 sm:order-4 sm:ml-0"
+          className="order-3 ml-auto hidden shrink-0 items-center gap-1 sm:order-4 sm:ml-0 sm:flex"
         >
           <SavedLink />
           <CartLink />
