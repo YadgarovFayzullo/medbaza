@@ -40,8 +40,11 @@ export function CatalogMenu({ categories }: { categories: CategoryTree[] }) {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="catalog-menu"
+        // The label is hidden on a phone to keep the header on one line; the
+        // button still announces itself, and the icon still says "catalog".
+        aria-label="Katalog"
         className={cn(
-          'inline-flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors',
+          'inline-flex h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors sm:px-4',
           open
             ? 'bg-primary-ink text-white'
             : 'border border-accent/15 bg-white text-accent hover:border-accent/30',
@@ -52,7 +55,7 @@ export function CatalogMenu({ categories }: { categories: CategoryTree[] }) {
         ) : (
           <LayoutGrid className="h-4 w-4" aria-hidden />
         )}
-        Katalog
+        <span className="hidden sm:inline">Katalog</span>
       </button>
 
       {open ? (

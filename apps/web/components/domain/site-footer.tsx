@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Activity, Mail, Send } from 'lucide-react';
+import { Activity, Instagram, Send } from 'lucide-react';
 
 const COLUMNS = [
   {
@@ -42,7 +42,7 @@ const COLUMNS = [
 export function SiteFooter() {
   return (
     <footer className="mt-14 border-t border-accent/10 bg-white">
-      <div className="w-full px-4 py-12 lg:px-gutter">
+      <div className="mx-auto w-full max-w-content px-4 py-12">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-3">
             <Link href="/" className="flex items-center gap-2 font-semibold">
@@ -56,8 +56,8 @@ export function SiteFooter() {
               klinikalar va kichik tibbiyot muassasalari uchun.
             </p>
             <div className="flex gap-2 pt-1">
-              <FooterIconLink href="mailto:support@medbaza.example" label="Elektron pochta">
-                <Mail className="h-4 w-4" aria-hidden />
+              <FooterIconLink href="https://instagram.com/" label="Instagram">
+                <Instagram className="h-4 w-4" aria-hidden />
               </FooterIconLink>
               <FooterIconLink href="https://t.me/" label="Telegram">
                 <Send className="h-4 w-4" aria-hidden />

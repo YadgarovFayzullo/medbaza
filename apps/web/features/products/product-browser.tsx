@@ -1,8 +1,7 @@
-import Link from 'next/link';
 import { SearchX } from 'lucide-react';
 
 import { ProductGrid } from '@/components/domain/product-card';
-import { EmptyState } from '@/components/ui';
+import { ButtonLink, EmptyState } from '@/components/ui';
 import { FilterPanel, SortSelect } from '@/features/products/filter-panel';
 import { catalog, type ProductQuery } from '@/lib/api-client/endpoints';
 import { toMinor } from '@/lib/utils/money';
@@ -116,12 +115,11 @@ export async function ProductBrowser({
           <div className="flex justify-center pt-4">
             {/* Kursorli sahifalash: katalog o’qish paytida o’zgaradi, shuning uchun
                 sahifa raqamlari yo’q (CLAUDE.md §6). */}
-            <Link
-              href={buildHref(basePath, params, page.next_cursor)}
-              className="inline-flex h-11 items-center rounded-lg border border-accent/15 bg-white px-5 text-sm font-medium hover:border-accent/30"
-            >
+            {/* The primitive, not a hand-rolled link: this one carried no text
+                colour and inherited whatever the surrounding block set. */}
+            <ButtonLink href={buildHref(basePath, params, page.next_cursor)} variant="secondary">
               Yana ko’rsatish
-            </Link>
+            </ButtonLink>
           </div>
         ) : null}
       </div>
