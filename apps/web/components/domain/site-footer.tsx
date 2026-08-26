@@ -42,7 +42,7 @@ const COLUMNS = [
 export function SiteFooter() {
   return (
     <footer className="mt-14 border-t border-accent/10 bg-white">
-      <div className="mx-auto max-w-content px-4 py-12">
+      <div className="w-full px-4 py-12 lg:px-gutter">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-3">
             <Link href="/" className="flex items-center gap-2 font-semibold">

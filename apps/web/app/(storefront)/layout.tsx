@@ -5,7 +5,9 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <main id="main" className="mx-auto w-full max-w-content flex-1 px-4 py-8">
+      {/* No width cap here — `(measured)/layout.tsx` applies it to the routes
+          that want it, leaving the product page free to run edge to edge. */}
+      <main id="main" className="w-full flex-1 py-8">
         {children}
       </main>
       <SiteFooter />

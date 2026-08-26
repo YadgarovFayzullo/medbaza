@@ -104,8 +104,16 @@ export function ListingForm({
         product ? `/seller/products/${product.id}` : '/seller/products',
         { method: product ? 'PATCH' : 'POST', body, token },
       );
-      router.push(`/seller/listings/${saved.id}`);
-      router.refresh();
+      if (product) {
+        // Already on this listing's page. Pushing the same URL re-runs the
+        // route *and* resets the scroll position, so the seller is thrown back
+        // to the top of a form they were still reading; the refresh below is
+        // then a second fetch of what the push just fetched.
+        router.refresh();
+      } else {
+        // A new listing has no page yet — the push both navigates and loads it.
+        router.push(`/seller/listings/${saved.id}`);
+      }
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.message);
@@ -113,6 +121,9 @@ export function ListingForm({
       } else {
         setError('E’lonni saqlab bo’lmadi.');
       }
+    } finally {
+      // Editing stays on this page, so nothing unmounts this component —
+      // without this the button spins forever on a save that in fact succeeded.
       setBusy(false);
     }
   }

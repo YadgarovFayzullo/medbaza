@@ -1,6 +1,6 @@
 import type { Config } from 'tailwindcss';
 
-import { palette, radius, shadow } from './lib/design-tokens';
+import { pageGutter, palette, radius, shadow } from './lib/design-tokens';
 
 /**
  * The single source of truth for design tokens (CLAUDE.md §3, §9).
@@ -55,6 +55,9 @@ const config: Config = {
       },
       maxWidth: {
         content: '1200px',
+      },
+      spacing: {
+        gutter: pageGutter,
       },
       keyframes: {
         'fade-in': {

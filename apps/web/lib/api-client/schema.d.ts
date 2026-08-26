@@ -730,6 +730,33 @@ export interface paths {
         patch: operations["updateMyProduct"];
         trace?: never;
     };
+    "/api/v1/seller/products/{product_id}/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add My Product Image
+         * @description Upload one catalog photo and append it to the listing's carousel.
+         *
+         *     JPEG, PNG or WebP, up to 5 MB. The first image is the storefront thumbnail;
+         *     reorder by sending the whole `images` list to PATCH /seller/products/{id}.
+         */
+        post: operations["addMyProductImage"];
+        /**
+         * Delete My Product Image
+         * @description Remove one photo from a listing, deleting the stored object with it.
+         */
+        delete: operations["deleteMyProductImage"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/seller/inventory": {
         parameters: {
             query?: never;
@@ -1055,6 +1082,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/media/products/{product_id}/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Product Image
+         * @description Serve a catalog photo from local storage. Public by design.
+         */
+        get: operations["getProductImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1222,6 +1269,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** Body_addMyProductImage */
+        Body_addMyProductImage: {
+            /** File */
+            file: string;
         };
         /** Body_uploadPrescription */
         Body_uploadPrescription: {
@@ -1817,6 +1869,11 @@ export interface components {
             description: string;
             /** Sku */
             sku: string;
+            /**
+             * Buyers Last 7D
+             * @default 0
+             */
+            buyers_last_7d: number;
             /** Images */
             images: string[];
             /** Specs */
@@ -3663,6 +3720,74 @@ export interface operations {
             };
         };
     };
+    addMyProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_addMyProductImage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deleteMyProductImage: {
+        parameters: {
+            query: {
+                key: string;
+            };
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     setMyProductStock: {
         parameters: {
             query?: never;
@@ -4174,6 +4299,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_AuditLogRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getProductImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

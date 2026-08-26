@@ -2396,6 +2396,120 @@
         }
       }
     },
+    "/api/v1/seller/products/{product_id}/images": {
+      "post": {
+        "tags": [
+          "seller"
+        ],
+        "summary": "Add My Product Image",
+        "description": "Upload one catalog photo and append it to the listing's carousel.\n\nJPEG, PNG or WebP, up to 5 MB. The first image is the storefront thumbnail;\nreorder by sending the whole `images` list to PATCH /seller/products/{id}.",
+        "operationId": "addMyProductImage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_addMyProductImage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "seller"
+        ],
+        "summary": "Delete My Product Image",
+        "description": "Remove one photo from a listing, deleting the stored object with it.",
+        "operationId": "deleteMyProductImage",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 512,
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/seller/inventory": {
       "put": {
         "tags": [
@@ -3424,6 +3538,56 @@
           }
         }
       }
+    },
+    "/api/v1/media/products/{product_id}/{filename}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Get Product Image",
+        "description": "Serve a catalog photo from local storage. Public by design.",
+        "operationId": "getProductImage",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3930,6 +4094,20 @@
           "created_at"
         ],
         "title": "AuditLogRead"
+      },
+      "Body_addMyProductImage": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_addMyProductImage"
       },
       "Body_uploadPrescription": {
         "properties": {
@@ -5585,6 +5763,11 @@
           "sku": {
             "type": "string",
             "title": "Sku"
+          },
+          "buyers_last_7d": {
+            "type": "integer",
+            "title": "Buyers Last 7D",
+            "default": 0
           },
           "images": {
             "items": {

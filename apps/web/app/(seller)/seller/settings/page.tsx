@@ -14,7 +14,9 @@ export default async function SellerSettingsPage() {
   const account = await seller.me(session.accessToken);
 
   return (
-    <div className="mx-auto max-w-2xl">
+    // Same width as the listing form — every form page in the panel reads at
+    // one measure, and the index pages stay full width for their tables.
+    <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Sotuvchi hisobi"
         description="Do’koningiz ma’lumotlari va muvofiqlik guruhi tekshiradigan hujjatlar."

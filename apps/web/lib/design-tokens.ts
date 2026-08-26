@@ -31,6 +31,13 @@ export const palette = {
 export const radius = '8px';
 
 /**
+ * Side gutter for the full-bleed surfaces — the product page and the site
+ * chrome above and below it. Proportional rather than fixed so the layout keeps
+ * breathing room on a wide monitor without being pinned to one screen size.
+ */
+export const pageGutter = '5%';
+
+/**
  * The page sits on white. `base` is no longer the page colour — it is the
  * recessed fill for wells, image placeholders, icon plates, and hover states,
  * which is what still separates a surface from what sits behind it now that

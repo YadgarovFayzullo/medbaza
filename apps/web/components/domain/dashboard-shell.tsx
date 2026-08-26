@@ -1,14 +1,10 @@
 import Link from 'next/link';
 import { Activity } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
 import { AccountMenu } from '@/components/domain/account-menu';
+import { NavLinks, type NavItem } from '@/components/domain/nav-links';
 
-export interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-}
+export type { NavItem };
 
 /**
  * Shared chrome for the three signed-in surfaces: account, seller, admin.
@@ -17,12 +13,10 @@ export interface NavItem {
 export function DashboardShell({
   title,
   nav,
-  activePath,
   children,
 }: {
   title: string;
   nav: NavItem[];
-  activePath: string;
   children: React.ReactNode;
 }) {
   return (
@@ -45,29 +39,7 @@ export function DashboardShell({
       </header>
 
       <div className="mx-auto flex w-full max-w-content flex-1 flex-col gap-6 px-4 py-6 lg:flex-row">
-        <nav aria-label={title} className="lg:w-56 lg:shrink-0">
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {nav.map((item) => {
-              const active = activePath === item.href || activePath.startsWith(`${item.href}/`);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm ${
-                      active
-                        ? 'bg-primary/10 font-medium text-primary-ink'
-                        : 'text-accent/70 hover:bg-base hover:text-accent'
-                    }`}
-                  >
-                    <item.icon className="h-4 w-4" aria-hidden />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        <NavLinks nav={nav} label={title} />
 
         <main id="main" className="min-w-0 flex-1">
           {children}

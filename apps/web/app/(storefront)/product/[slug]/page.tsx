@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { FileText, Package, Star, Truck } from 'lucide-react';
+import { Check, FileText, Package, ShoppingBag, Star, Truck } from 'lucide-react';
 
 import { ProductGrid } from '@/components/domain/product-card';
 import { Price } from '@/components/domain/price';
@@ -10,9 +10,10 @@ import {
   StockIndicator,
   VerifiedSellerBadge,
 } from '@/components/domain/trust';
-import { Alert, Card, CardBody, CardHeader, CardTitle } from '@/components/ui';
+import { Alert, Badge, Card, CardBody, CardHeader, CardTitle } from '@/components/ui';
 import { AddToCart } from '@/features/cart/add-to-cart';
 import { ApiError } from '@/lib/api-client';
+import { ProductGallery } from '@/features/products/product-gallery';
 import { catalog } from '@/lib/api-client/endpoints';
 import { SITE_CURRENCY, formatDate, formatMoney } from '@/lib/utils/money';
 
@@ -48,7 +49,10 @@ export default async function ProductPage({ params }: { params: { slug: string }
   ]);
 
   return (
-    <div className="space-y-14">
+    // Runs the full width of the shell rather than sitting inside the storefront's
+    // 1200px measure, held off each edge by a proportional gutter so the layout
+    // never touches the viewport border on a wide monitor.
+    <div className="space-y-14 px-4 lg:px-gutter">
       <nav aria-label="Navigatsiya zanjiri" className="text-sm text-accent/50">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -67,59 +71,110 @@ export default async function ProductPage({ params }: { params: { slug: string }
         </ol>
       </nav>
 
-      <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr]">
-        {/* Galereya */}
-        <div className="space-y-3">
-          <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg border border-accent/10 bg-white">
-            {product.images[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={product.images[0]}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <Package className="h-12 w-12 text-accent/15" aria-hidden />
-            )}
+      {/* Galereya | mahsulot | xarid kartasi */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
+        <ProductGallery images={product.images} name={product.name} />
+
+        {/* Mahsulot haqida: nomi, sotuvchisi va tavsifi bir ustunda */}
+        <div className="space-y-4">
+          {product.brand ? (
+            <p className="text-xs font-semibold uppercase tracking-wide text-accent/50">
+              {product.brand}
+            </p>
+          ) : null}
+          <h1 className="text-3xl">{product.name}</h1>
+
+          {/* Nomi, keyin bahosi, keyin sotuvchi belgisi */}
+          {product.rating_average !== null ? (
+            <span className="inline-flex items-center gap-1 text-sm text-accent/60">
+              <Star className="h-3.5 w-3.5 fill-primary-ink text-primary-ink" aria-hidden />
+              {product.rating_average.toFixed(1)}
+              <span className="text-accent/40">({product.rating_count} sharh)</span>
+            </span>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <VerifiedSellerBadge verified={product.seller.verified} />
+            <CertificationBadges certifications={product.certifications} />
           </div>
-          {product.images.length > 1 ? (
-            <ul className="grid grid-cols-4 gap-3">
-              {product.images.slice(0, 8).map((image, index) => (
-                <li
-                  key={image}
-                  className="overflow-hidden rounded-lg border border-accent/10 bg-white"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image}
-                    alt={`${product.name} — ${index + 1}-rasm`}
-                    className="aspect-square w-full object-cover"
-                  />
-                </li>
-              ))}
-            </ul>
+
+          {product.prescription_required ? (
+            <Alert tone="warning" title="Retsept talab qilinadi">
+              Rasmiylashtirishda retsept yuklashingiz so’raladi. Buyurtma jo’natilishidan oldin uni
+              litsenziyalangan mutaxassis tasdiqlaydi — sotuvchi hujjatni ko’rmaydi.
+            </Alert>
+          ) : null}
+
+          {product.description ? (
+            <div className="border-t border-accent/10 pt-4">
+              <h2 className="text-sm font-medium">Mahsulot haqida</h2>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-accent/75">
+                {product.description}
+              </p>
+            </div>
           ) : null}
         </div>
 
-        {/* Xarid bloki */}
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <VerifiedSellerBadge verified={product.seller.verified} />
-              {product.rating_average !== null ? (
-                <span className="inline-flex items-center gap-1 text-sm text-accent/60">
-                  <Star className="h-3.5 w-3.5 fill-primary-ink text-primary-ink" aria-hidden />
-                  {product.rating_average.toFixed(1)}
-                  <span className="text-accent/40">({product.rating_count})</span>
+        {/* Xarid kartasi, so‘ng sotuvchi kartasi */}
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <Card className="space-y-5 p-5">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <Price
+                amountMinor={product.price_amount_minor}
+                currency={product.currency}
+                unit={product.unit_label}
+                size="lg"
+              />
+              {/* Display only — an order is always built from the selling
+                  price, never from this (§5.1). */}
+              {product.compare_at_amount_minor ? (
+                <span className="text-sm text-accent/40 line-through">
+                  {formatMoney(product.compare_at_amount_minor, product.currency)}
                 </span>
               ) : null}
+              {product.discount_percent ? (
+                <Badge tone="primary">−{product.discount_percent}%</Badge>
+              ) : null}
             </div>
-            {product.brand ? (
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent/50">
-                {product.brand}
-              </p>
-            ) : null}
-            <h1 className="text-3xl">{product.name}</h1>
+
+            <AddToCart
+              productId={product.id}
+              maxQuantity={product.stock}
+              disabled={!product.in_stock}
+            />
+
+            <ul className="space-y-2 border-t border-accent/10 pt-4 text-sm text-accent/70">
+              {product.in_stock ? (
+                <li className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+                  <span>{product.stock} dona xarid qilish mumkin</span>
+                </li>
+              ) : null}
+              {/* Real count of distinct buyers this week, straight from the API.
+                  Absent rather than dressed up when nobody has bought yet. */}
+              {product.buyers_last_7d > 0 ? (
+                <li className="flex items-start gap-2">
+                  <ShoppingBag className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+                  <span>Bu haftada {product.buyers_last_7d} kishi sotib oldi</span>
+                </li>
+              ) : null}
+              <li className="flex items-start gap-2">
+                <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+                <span>
+                  Bu sotuvchining {formatMoney(FREE_SHIPPING_THRESHOLD_MINOR, SITE_CURRENCY)} dan
+                  yuqori buyurtmalari uchun yetkazish bepul
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden />
+                <Link href="/returns" className="hover:text-primary-ink hover:underline">
+                  Ochilmagan mahsulotlarni 30 kun ichida qaytarish
+                </Link>
+              </li>
+            </ul>
+          </Card>
+
+          <Card className="space-y-2 p-5">
             <p className="text-sm text-accent/60">
               Sotuvchi:{' '}
               <Link
@@ -130,62 +185,13 @@ export default async function ProductPage({ params }: { params: { slug: string }
               </Link>{' '}
               · SKU {product.sku}
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <Price
-              amountMinor={product.price_amount_minor}
-              currency={product.currency}
-              unit={product.unit_label}
-              size="lg"
-            />
             <StockIndicator stock={product.stock} inStock={product.in_stock} />
-          </div>
-
-          <CertificationBadges certifications={product.certifications} />
-
-          {product.prescription_required ? (
-            <Alert tone="warning" title="Retsept talab qilinadi">
-              Rasmiylashtirishda retsept yuklashingiz so’raladi. Buyurtma jo’natilishidan oldin uni
-              litsenziyalangan mutaxassis tasdiqlaydi — sotuvchi hujjatni ko’rmaydi.
-            </Alert>
-          ) : null}
-
-          <AddToCart
-            productId={product.id}
-            maxQuantity={product.stock}
-            disabled={!product.in_stock}
-          />
-
-          <ul className="space-y-2 border-t border-accent/10 pt-5 text-sm text-accent/70">
-            <li className="flex items-center gap-2">
-              <Truck className="h-4 w-4 text-primary-ink" aria-hidden />
-              Bu sotuvchining {formatMoney(FREE_SHIPPING_THRESHOLD_MINOR, SITE_CURRENCY)} dan yuqori
-              buyurtmalari uchun yetkazish bepul
-            </li>
-            <li className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary-ink" aria-hidden />
-              <Link href="/returns" className="hover:text-primary-ink hover:underline">
-                Ochilmagan mahsulotlarni 30 kun ichida qaytarish
-              </Link>
-            </li>
-          </ul>
+          </Card>
         </div>
       </div>
 
-      {/* Tavsif va xususiyatlar */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Mahsulot haqida</CardTitle>
-          </CardHeader>
-          <CardBody>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-accent/75">
-              {product.description}
-            </p>
-          </CardBody>
-        </Card>
-
+      {/* Xususiyatlar — tavsif yuqoriga, mahsulot ustuniga ko‘chdi */}
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Xususiyatlar</CardTitle>

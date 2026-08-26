@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/domain/section';
 import { ListingForm } from '@/features/sellers/listing-form';
 import { ArchiveListingButton } from '@/features/sellers/archive-button';
+import { ListingImages } from '@/features/sellers/listing-images';
 import { ApiError } from '@/lib/api-client';
 import { catalog, seller } from '@/lib/api-client/endpoints';
 import { requireSession } from '@/lib/auth/guards';
@@ -34,6 +35,7 @@ export default async function EditListingPage({ params }: { params: { id: string
           <ArchiveListingButton productId={product.id} archived={product.status === 'archived'} />
         }
       />
+      <ListingImages productId={product.id} images={product.images} />
       <ListingForm categories={categories} product={product} />
     </div>
   );
