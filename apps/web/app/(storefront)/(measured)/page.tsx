@@ -7,7 +7,7 @@ import { HeroCarousel, type Slide } from '@/components/domain/hero-carousel';
 import { ProductGrid } from '@/components/domain/product-card';
 import { ProductRail } from '@/components/domain/product-rail';
 import { ButtonLink } from '@/components/ui';
-import { catalog } from '@/lib/api-client/endpoints';
+import { catalog, type ProductPage } from '@/lib/api-client/endpoints';
 
 // Turkum va mahsulot sahifalari ISR bilan ishlaydi (CLAUDE.md §3.8).
 export const revalidate = 300;
@@ -47,12 +47,32 @@ const SLIDES: Slide[] = [
   },
 ];
 
+const EMPTY_PAGE: ProductPage = { items: [], next_cursor: null };
+
+/**
+ * Falls back to an empty rail when the catalog cannot be reached.
+ *
+ * This page is prerendered, so an API that is unreachable at build time would
+ * otherwise fail the whole deploy on a rail that is decoration, not content.
+ * Every other storefront route already degrades this way, and ISR fills the
+ * rails in on the next revalidation. The failure is logged rather than
+ * swallowed, so a real outage is still visible (§12.4).
+ */
+async function orEmpty<T>(work: Promise<T>, fallback: T, rail: string): Promise<T> {
+  try {
+    return await work;
+  } catch (error) {
+    console.warn(`homepage: "${rail}" unavailable`, error instanceof Error ? error.message : error);
+    return fallback;
+  }
+}
+
 export default async function HomePage() {
   const [categories, deals, popular, newest] = await Promise.all([
-    catalog.categories(),
-    catalog.products({ on_sale: true, in_stock: true, limit: 12 }),
-    catalog.products({ sort: 'rating', in_stock: true, limit: 12 }),
-    catalog.products({ sort: 'newest', limit: 10 }),
+    orEmpty(catalog.categories(), [], 'categories'),
+    orEmpty(catalog.products({ on_sale: true, in_stock: true, limit: 12 }), EMPTY_PAGE, 'deals'),
+    orEmpty(catalog.products({ sort: 'rating', in_stock: true, limit: 12 }), EMPTY_PAGE, 'popular'),
+    orEmpty(catalog.products({ sort: 'newest', limit: 10 }), EMPTY_PAGE, 'newest'),
   ]);
 
   return (
