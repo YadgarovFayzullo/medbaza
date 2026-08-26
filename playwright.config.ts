@@ -5,8 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Start both first:
  *   docker compose up -d db redis
- *   cd apps/api && alembic upgrade head && python -m app.scripts.seed && uvicorn app.main:app
- *   cd apps/web && pnpm dev
+ *   cd ../medbaza-api && docker compose up -d   # api, worker, db, redis
+ *   cd apps/web && npm run dev
  */
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 

@@ -68,7 +68,7 @@ All rows below are **settled**. Do not substitute, add an alternative, or introd
 
 ## 3. Architecture principles
 
-- **Two deployable apps, one repo.** `apps/api` and `apps/web` share nothing at runtime — only the OpenAPI contract.
+- **Two deployable apps, two repositories.** The API lives in `medbaza-api`, the storefront in `MedBaza`. They share nothing at runtime and nothing at build time — only the OpenAPI contract. That contract is now the boundary between two histories, so a router schema change and the regenerated client land in two commits instead of one; keep them in the same working session.
 - **Feature-first inside each app.** Group by domain (`products`, `orders`, `sellers`, `cart`), not by technical type alone. The frontend mirrors the backend's domain names exactly.
 - **Thin routers, fat services.** HTTP concerns stop at the router boundary.
 - **The database is the source of truth for invariants.** Anything that must never be violated (non-negative stock, unique SKU per seller, one review per buyer per product) gets a constraint, not just a service check.
@@ -363,7 +363,7 @@ reachable only through an expiring presigned URL (§5.5, §12.2).
 
 ## 7. Data model
 
-Core entities (`apps/api/app/models/`). Every model has `id: UUID`, `created_at`, `updated_at`.
+Core entities (`app/models/` in `medbaza-api`). Every model has `id: UUID`, `created_at`, `updated_at`.
 
 | Model | Notes |
 |---|---|
@@ -393,64 +393,34 @@ Core entities (`apps/api/app/models/`). Every model has `id: UUID`, `created_at`
 
 ## 8. Folder structure
 
+This repository holds the storefront. The API is a separate repository
+(`medbaza-api`) and is reached only over HTTP.
+
 ```
-/
+MedBaza/
 ├── apps/
-│   ├── web/                              # Next.js frontend
-│   │   ├── app/
-│   │   │   ├── (storefront)/             # Public buyer-facing routes
-│   │   │   │   ├── page.tsx
-│   │   │   │   ├── category/[slug]/
-│   │   │   │   ├── product/[slug]/
-│   │   │   │   ├── cart/
-│   │   │   │   └── checkout/
-│   │   │   ├── (account)/                # Authenticated buyer routes
-│   │   │   ├── (seller)/                 # Seller dashboard routes
-│   │   │   ├── (admin)/                  # Admin routes
-│   │   │   └── layout.tsx
-│   │   ├── components/
-│   │   │   ├── ui/                       # Restyled shadcn primitives — no business logic
-│   │   │   └── domain/                   # Shared cross-feature compositions
-│   │   ├── features/                     # Domain modules, names mirror the backend
-│   │   │   ├── products/ orders/ sellers/ cart/ prescriptions/
-│   │   ├── lib/
-│   │   │   ├── api-client/               # Generated from OpenAPI — do not hand-edit
-│   │   │   └── utils/
-│   │   └── tailwind.config.ts
-│   │
-│   └── api/                              # FastAPI backend
+│   └── web/                              # Next.js frontend
 │       ├── app/
-│       │   ├── main.py                   # App entrypoint, router registration, error handlers
-│       │   ├── core/                     # settings.py, errors.py, security.py, logging.py
-│       │   ├── db/                        # engine, session, base, mixins
-│       │   ├── auth/                     # JWT, current-user dependency, role guards
-│       │   ├── models/                   # SQLAlchemy models
-│       │   ├── schemas/                  # Pydantic request/response schemas
-│       │   ├── api/                       # Routers, one module per domain
-│       │   │   ├── deps.py
-│       │   │   ├── products.py orders.py checkout.py sellers.py
-│       │   │   ├── prescriptions.py payments.py admin.py
-│       │   ├── services/                 # Business logic
-│       │   │   ├── catalog_service.py order_service.py inventory_service.py
-│       │   │   ├── seller_service.py prescription_service.py outbox_service.py
-│       │   │   └── payments/
-│       │   │       ├── base.py           # PaymentProvider port (§3.7)
-│       │   │       ├── types.py          # Provider-agnostic dataclasses
-│       │   │       └── adapters/         # fake.py (+ the real one, once §4 is decided)
-│       │   ├── workers/                  # arq worker settings + tasks/ per domain
-│       │   ├── storage/                  # S3/R2 client, presigning, encryption helpers
-│       │   └── scripts/                  # seed.py and other one-off operational scripts
-│       ├── alembic/versions/
-│       ├── tests/
-│       │   ├── unit/                     # Services, pure logic, no DB
-│       │   ├── integration/              # Routers + real Postgres
-│       │   └── conftest.py
-│       ├── Dockerfile
-│       ├── .env.example
-│       └── pyproject.toml
-│
-├── tests/e2e/                            # Playwright, web + api together
-├── docker-compose.yml                    # Postgres + Redis (+ api, optionally)
+│       │   ├── (storefront)/             # Public buyer-facing routes
+│       │   │   ├── (measured)/           # Routes held to the 1200px measure
+│       │   │   │   ├── page.tsx category/[slug]/ cart/ checkout/ …
+│       │   │   └── product/[slug]/       # Full-bleed, opts out of the measure
+│       │   ├── (account)/                # Authenticated buyer routes
+│       │   ├── (seller)/                 # Seller dashboard routes
+│       │   ├── (admin)/                  # Admin routes
+│       │   └── layout.tsx
+│       ├── components/
+│       │   ├── ui/                       # Restyled shadcn primitives — no business logic
+│       │   └── domain/                   # Shared cross-feature compositions
+│       ├── features/                     # Domain modules, names mirror the API
+│       │   ├── products/ orders/ sellers/ cart/ prescriptions/
+│       ├── lib/
+│       │   ├── api-client/               # Generated from OpenAPI — do not hand-edit
+│       │   ├── design-tokens.ts
+│       │   └── utils/
+│       └── tailwind.config.ts
+├── tests/e2e/                            # Playwright against a running web + api
+├── package.json                          # npm workspace root
 ├── CLAUDE.md
 └── README.md
 ```
@@ -495,95 +465,28 @@ export const palette = {
 
 ## 10. Local development
 
-Postgres and Redis run in Docker locally — no manual installs. The API runs either in Compose or on the host with `uvicorn --reload`; the Docker image is authoritative for what ships.
+Nothing in this repository renders without the API. It lives in `medbaza-api`
+and brings its own Docker stack — Postgres, Redis, the API and the arq worker —
+so there is no compose file here.
 
-```yaml
-# docker-compose.yml (repo root)
-services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: medsupply
-      POSTGRES_PASSWORD: medsupply
-      POSTGRES_DB: medsupply
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U medsupply"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports: ["6379:6379"]
-
-  api:
-    build: { context: ./apps/api }
-    env_file: ./apps/api/.env
-    depends_on:
-      db: { condition: service_healthy }
-      redis: { condition: service_started }
-    ports: ["8000:8000"]
-    volumes: ["./apps/api:/app"]
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  worker:
-    build: { context: ./apps/api }
-    env_file: ./apps/api/.env
-    depends_on:
-      redis: { condition: service_started }
-    volumes: ["./apps/api:/app"]
-    command: arq app.workers.settings.WorkerSettings
-
-volumes:
-  pgdata:
+```bash
+cd ../medbaza-api && docker compose up -d   # api, worker, db, redis
 ```
 
-### 10.1 Environment variables (`apps/api/.env`, documented in `.env.example`)
+Its README covers migrations, seeding and the dev sign-ins.
+
+### 10.1 Environment variables (`apps/web/.env.local`, documented in `.env.example`)
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | `postgresql+asyncpg://medsupply:medsupply@localhost:5432/medsupply` (`@db:5432` inside Compose) |
-| `REDIS_URL` | `redis://localhost:6379/0` |
-| `JWT_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` | Auth |
-| `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Object storage |
-| `PRESCRIPTION_ENCRYPTION_KEY` | At-rest encryption for sensitive uploads |
-| `IMAGE_BUCKET`, `IMAGE_PUBLIC_BASE_URL` | Public catalog-image bucket and its hostname (§5.7). Empty hostname falls back to the API's dev media route |
-| `API_BASE_URL` | Used to build that dev fallback URL |
-| `REVALIDATE_SECRET` | Shared with the web app's `POST /api/revalidate`; must match `apps/web/.env.local`. Empty disables the storefront cache bust |
-| `PAYMENT_PROVIDER` | `fake` until §4 is decided |
-| `EMAIL_API_KEY`, `EMAIL_FROM` | Transactional email |
-| `SENTRY_DSN`, `ENVIRONMENT`, `LOG_LEVEL` | Observability |
+| `NEXT_PUBLIC_API_URL` | Base URL of the API. Public, because Server Components and the browser both call it; nothing secret ever lives in a `NEXT_PUBLIC_` variable |
+| `REVALIDATE_SECRET` | Shared with the API, which calls `POST /api/revalidate` to bust ISR tags after a catalog change. Must match the API's value |
 
-`.env.example` lists every variable with a safe placeholder. Adding a setting to `core/settings.py` means adding it there in the same PR.
+Adding a variable means adding it to `.env.example` in the same change. A
+variable the API also needs must be set in both repositories — that duplication
+is the price of the split, so name them identically.
 
 ### 10.2 Commands
-
-**Datastores (repo root)**
-
-```bash
-docker compose up -d db redis   # datastores only; run api/web on the host
-docker compose up -d            # full backend stack
-docker compose down             # stop
-docker compose down -v          # stop and WIPE the DB volume — destructive, confirm first
-```
-
-**Backend (`apps/api`)**
-
-```bash
-uvicorn app.main:app --reload                  # dev server
-arq app.workers.settings.WorkerSettings        # background worker
-alembic upgrade head                           # apply migrations
-alembic revision --autogenerate -m "message"   # create migration (always review the output)
-python -m app.scripts.seed                     # seed dev data
-pytest                                         # tests
-ruff check . && black --check . && mypy app    # lint + types
-```
-
-**Frontend (`apps/web`)**
 
 ```bash
 npm run dev            # dev server
@@ -591,16 +494,13 @@ npm run build          # production build
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
 npm test               # vitest
-npm run generate:api   # regenerate the typed client from the backend OpenAPI schema
+npm run generate:api   # regenerate the typed client from the API's OpenAPI schema
+npm run test:e2e       # playwright against a running web + api
 ```
 
-**E2E (repo root)**
-
-```bash
-npm run test:e2e       # playwright against local web + api
-```
-
----
+`generate:api` reads `/openapi.json` from a **running** API, so start the other
+stack first. The generated diff is committed here; the schema change that
+produced it is committed there.
 
 ## 11. Testing
 
