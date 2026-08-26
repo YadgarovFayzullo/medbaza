@@ -17,7 +17,7 @@ anything. This file only covers getting it running.
 
 - Docker (Postgres and Redis)
 - Python 3.12+
-- Node 20+ and pnpm 9
+- Node 20+ and npm 10
 
 ## Run it
 
@@ -39,8 +39,8 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 # 4. Web
 cd ../web
 cp .env.example .env.local
-pnpm install
-pnpm dev                                   # http://localhost:3000
+npm install
+npm run dev                                   # http://localhost:3000
 ```
 
 ### Dev sign-ins
@@ -62,10 +62,10 @@ Created by the seed script. Password for all of them: `MedBaza-dev-2026`.
 .venv/bin/ruff check . && .venv/bin/black --check . && .venv/bin/mypy app
 
 # Web — from apps/web
-pnpm typecheck && pnpm lint && pnpm test
+npm run typecheck && npm run lint && npm test
 
 # End to end — from the repo root, with web + api running
-pnpm test:e2e
+npm run test:e2e
 ```
 
 Integration tests create and drop their own `medsupply_test` database on the same Postgres
@@ -76,7 +76,7 @@ container. Override with `TEST_DATABASE_URL` if you keep it elsewhere.
 The frontend never hand-writes a type for an API payload. After changing any router schema:
 
 ```bash
-cd apps/web && pnpm generate:api   # pulls /openapi.json from a running API, regenerates schema.d.ts
+cd apps/web && npm run generate:api   # pulls /openapi.json from a running API, regenerates schema.d.ts
 ```
 
 Commit the generated diff in the same change.

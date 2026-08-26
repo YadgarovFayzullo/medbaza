@@ -2,7 +2,7 @@
  * The typed API client.
  *
  * Types come from `schema.d.ts`, which is generated from the backend's OpenAPI
- * document by `pnpm generate:api`. Nothing in the app hand-writes a type for an
+ * document by `npm run generate:api`. Nothing in the app hand-writes a type for an
  * API payload, and nothing outside this directory calls `fetch` against the API
  * (CLAUDE.md §2, §3.8).
  */
