@@ -481,6 +481,7 @@ Its README covers migrations, seeding and the dev sign-ins.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL of the API. Public, because Server Components and the browser both call it; nothing secret ever lives in a `NEXT_PUBLIC_` variable |
 | `REVALIDATE_SECRET` | Shared with the API, which calls `POST /api/revalidate` to bust ISR tags after a catalog change. Must match the API's value |
+| `NEXT_PUBLIC_DEMO_CATALOG` | `true` serves `lib/api-client/demo-catalog.ts` in place of every catalog read, for the window where this app is deployed and the API is not. Reads only — cart, auth and checkout still need a real API. Remove the flag, the fixture and its branches once the API is hosted |
 
 Adding a variable means adding it to `.env.example` in the same change. A
 variable the API also needs must be set in both repositories — that duplication

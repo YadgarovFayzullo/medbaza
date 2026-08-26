@@ -4,7 +4,14 @@
  * Server Components import these directly. Client Components reach them
  * through TanStack Query hooks in `features/<domain>/` (CLAUDE.md §3.8).
  */
-import { type GetResponse, type PostResponse, type RequestOptions, request } from './index';
+import {
+  ApiError,
+  type GetResponse,
+  type PostResponse,
+  type RequestOptions,
+  request,
+} from './index';
+import { DEMO_CATALOG } from './demo-catalog';
 
 type Options = Pick<RequestOptions, 'token' | 'cache' | 'next' | 'signal'>;
 
@@ -60,42 +67,130 @@ export interface ProductQuery {
   cursor?: string;
 }
 
+/**
+ * Serve the frozen catalog instead of calling the API.
+ *
+ * Set `NEXT_PUBLIC_DEMO_CATALOG=true` while the API is not hosted anywhere.
+ * Only catalog *reads* are covered: anything that signs a person in, holds a
+ * basket, or places an order is untouched and still needs a real API.
+ */
+const DEMO = process.env.NEXT_PUBLIC_DEMO_CATALOG === 'true';
+
+/** Narrows the frozen snapshot back to the generated types it was captured from. */
+function demo<T>(value: unknown): Promise<T> {
+  return Promise.resolve(value as T);
+}
+
+/** The subset of filters the frozen catalog can honour without a database. */
+function demoProducts(query: ProductQuery): ProductPage {
+  const all = DEMO_CATALOG.products.items as unknown as ProductListItem[];
+  let items = all;
+
+  if (query.category) {
+    const slugs = new Set<string>([query.category]);
+    for (const parent of DEMO_CATALOG.categories) {
+      if (parent.slug === query.category) {
+        for (const child of parent.children) slugs.add(child.slug);
+      }
+    }
+    const ids = new Set(
+      DEMO_CATALOG.categories.flatMap((parent) => [
+        ...(slugs.has(parent.slug) ? [parent.id] : []),
+        ...parent.children.filter((child) => slugs.has(child.slug)).map((child) => child.id),
+      ]),
+    );
+    items = items.filter((item) => ids.has(item.category_id));
+  }
+  if (query.q) {
+    const term = query.q.toLowerCase();
+    items = items.filter((item) => item.name.toLowerCase().includes(term));
+  }
+  if (query.brand) items = items.filter((item) => item.brand === query.brand);
+  if (query.on_sale) items = items.filter((item) => item.compare_at_amount_minor !== null);
+  if (query.in_stock) items = items.filter((item) => item.in_stock);
+  if (query.certification) {
+    items = items.filter((item) => item.certifications.includes(query.certification as string));
+  }
+  if (query.min_price_minor !== undefined) {
+    items = items.filter((item) => item.price_amount_minor >= query.min_price_minor!);
+  }
+  if (query.max_price_minor !== undefined) {
+    items = items.filter((item) => item.price_amount_minor <= query.max_price_minor!);
+  }
+  if (query.sort === 'price_asc') {
+    items = [...items].sort((a, b) => a.price_amount_minor - b.price_amount_minor);
+  } else if (query.sort === 'price_desc') {
+    items = [...items].sort((a, b) => b.price_amount_minor - a.price_amount_minor);
+  } else if (query.sort === 'rating') {
+    items = [...items].sort((a, b) => (b.rating_average ?? 0) - (a.rating_average ?? 0));
+  }
+
+  // No cursor: the snapshot is one page and always will be.
+  return { items: items.slice(0, query.limit ?? 24), next_cursor: null };
+}
+
 export const catalog = {
   categories: (options: Options = {}) =>
-    request<CategoryTree[]>(
-      '/categories',
-      cached([CACHE_TAGS.catalog, CACHE_TAGS.categories], options),
-    ),
+    DEMO
+      ? demo<CategoryTree[]>(DEMO_CATALOG.categories)
+      : request<CategoryTree[]>(
+          '/categories',
+          cached([CACHE_TAGS.catalog, CACHE_TAGS.categories], options),
+        ),
 
   products: (query: ProductQuery = {}, options: Options = {}) =>
-    request<ProductPage>('/products', {
-      query: { ...query },
-      ...cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
-    }),
+    DEMO
+      ? demo<ProductPage>(demoProducts(query))
+      : request<ProductPage>('/products', {
+          query: { ...query },
+          ...cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
+        }),
 
   product: (slug: string, options: Options = {}) =>
-    request<Product>(
-      `/products/${slug}`,
-      cached([CACHE_TAGS.catalog, CACHE_TAGS.product(slug)], options),
-    ),
+    DEMO
+      ? demo<Product>(
+          (DEMO_CATALOG.details as Record<string, unknown>)[slug] ??
+            Promise.reject(new ApiError(404, 'NOT_FOUND', 'Mahsulot topilmadi.', {}, '')),
+        )
+      : request<Product>(
+          `/products/${slug}`,
+          cached([CACHE_TAGS.catalog, CACHE_TAGS.product(slug)], options),
+        ),
 
   related: (slug: string, options: Options = {}) =>
-    request<ProductListItem[]>(
-      `/products/${slug}/related`,
-      cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
-    ),
+    DEMO
+      ? demo<ProductListItem[]>(
+          (DEMO_CATALOG.products.items as unknown as ProductListItem[])
+            .filter((item) => item.slug !== slug)
+            .slice(0, 6),
+        )
+      : request<ProductListItem[]>(
+          `/products/${slug}/related`,
+          cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
+        ),
 
   brands: (category?: string, options: Options = {}) =>
-    request<string[]>('/products/brands', {
-      query: { category },
-      ...cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
-    }),
+    DEMO
+      ? demo<string[]>(DEMO_CATALOG.brands)
+      : request<string[]>('/products/brands', {
+          query: { category },
+          ...cached([CACHE_TAGS.catalog, CACHE_TAGS.products], options),
+        }),
 
   suggest: (q: string, options: Options = {}) =>
-    request<SearchSuggestions>('/search/suggest', { query: { q }, ...options }),
+    DEMO
+      ? demo<SearchSuggestions>({
+          products: (DEMO_CATALOG.products.items as unknown as ProductListItem[])
+            .filter((item) => item.name.toLowerCase().includes(q.toLowerCase()))
+            .slice(0, 6),
+          categories: [],
+        })
+      : request<SearchSuggestions>('/search/suggest', { query: { q }, ...options }),
 
   reviews: (slug: string, cursor?: string, options: Options = {}) =>
-    request<ReviewPage>(`/products/${slug}/reviews`, { query: { cursor }, ...options }),
+    DEMO
+      ? demo<ReviewPage>({ items: [], next_cursor: null })
+      : request<ReviewPage>(`/products/${slug}/reviews`, { query: { cursor }, ...options }),
 
   createReview: (
     slug: string,
