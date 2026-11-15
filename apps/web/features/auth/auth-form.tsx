@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { Alert, Button, Card, Checkbox, Input } from '@/components/ui';
 import { useSession } from '@/features/auth/session-provider';
+import { safeRedirectPath } from '@/lib/utils/safe-redirect';
 
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const router = useRouter();
@@ -19,7 +20,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const next = params.get('next') ?? '/';
+  const next = safeRedirectPath(params.get('next'));
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
