@@ -61,7 +61,7 @@ All rows below are **settled**. Do not substitute, add an alternative, or introd
 | Frontend tests | Vitest, Playwright | See §11 |
 | Backend lint | Ruff + Black + mypy (strict on `app/services`, `app/models`) | CI-blocking |
 | Frontend lint | ESLint + Prettier + `tsc --noEmit` | CI-blocking |
-| Deploy | API: containerized (Fly.io / Render / ECS) · Web: Vercel · DB: managed Postgres | The dev Dockerfile is the prod Dockerfile |
+| Deploy | API + Postgres + Redis: one Docker host behind Traefik · Web: Vercel | The dev Dockerfile is the prod Dockerfile; see §10.3 |
 | Monitoring | Sentry (both apps), structured JSON logs | See §12.4 |
 
 ---
@@ -489,7 +489,6 @@ Its README covers migrations, seeding and the dev sign-ins.
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL of the API. Public, because Server Components and the browser both call it; nothing secret ever lives in a `NEXT_PUBLIC_` variable |
 | `REVALIDATE_SECRET` | Shared with the API, which calls `POST /api/revalidate` to bust ISR tags after a catalog change. Must match the API's value |
-| `NEXT_PUBLIC_DEMO_CATALOG` | `true` serves `lib/api-client/demo-catalog.ts` in place of every catalog read, for the window where this app is deployed and the API is not. Reads only — cart, auth and checkout still need a real API. Remove the flag, the fixture and its branches once the API is hosted |
 
 Adding a variable means adding it to `.env.example` in the same change. A
 variable the API also needs must be set in both repositories — that duplication
@@ -510,6 +509,37 @@ npm run test:e2e       # playwright against a running web + api
 `generate:api` reads `/openapi.json` from a **running** API, so start the other
 stack first. The generated diff is committed here; the schema change that
 produced it is committed there.
+
+### 10.3 Production
+
+The API, its Postgres and its Redis run as one Compose project on a single
+Docker host. The storefront stays on Vercel and reaches the API over HTTPS, so
+`NEXT_PUBLIC_API_URL` there and `CORS_ORIGINS` on the API name each other.
+
+**Rules**
+
+- **Traefik is the only way in.** It already owns `:80` and `:443` on that host,
+  runs with `exposedbydefault=false`, and routes by container label over the
+  external `proxy` network. Every service that should be reachable opts in with
+  `traefik.enable=true`, an entrypoint of `websecure`, and `certresolver=le`.
+- **No service publishes a host port.** Not the API, and least of all Postgres
+  or Redis. A published port is a second door next to the one Traefik guards,
+  and it has no TLS in front of it. `ports:` does not appear in
+  `docker-compose.prod.yml` at all — if a container needs to be reached, it
+  gets a label, not a port.
+- Only what is actually routed joins the `proxy` network. The datastores and
+  the arq worker stay on the project's own `default` network.
+- A service on more than one network must name its port explicitly
+  (`loadbalancer.server.port`); Traefik stops guessing once there is a choice.
+- `.env` lives next to the compose file on the server, mode `600`, and is never
+  committed or copied back. Secrets are generated on the host. Regenerating
+  `SECRET_KEY` signs everyone out; regenerating `PRESCRIPTION_ENCRYPTION_KEY`
+  makes every stored document permanently unreadable.
+- `PAYMENT_PROVIDER` stays `fake` in production too. §4 is still open, and
+  being deployed is not a reason to guess.
+- Migrations run as a one-off `docker compose run --rm api alembic upgrade head`
+  after the image is built and before traffic matters — never automatically on
+  container start, where two replicas would race.
 
 ## 11. Testing
 
