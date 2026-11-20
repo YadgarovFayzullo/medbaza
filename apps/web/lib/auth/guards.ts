@@ -6,11 +6,13 @@
  */
 import { redirect } from 'next/navigation';
 
+import { safeRedirectPath } from '@/lib/utils/safe-redirect';
+
 import { getSession, type Session } from './session';
 
 export async function requireSession(returnTo: string): Promise<Session> {
   const session = await getSession();
-  if (!session) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
+  if (!session) redirect(`/login?next=${encodeURIComponent(safeRedirectPath(returnTo))}`);
   return session;
 }
 
