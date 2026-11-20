@@ -59,7 +59,7 @@ export function SiteFooter() {
               <FooterIconLink href="https://instagram.com/" label="Instagram">
                 <Instagram className="h-4 w-4" aria-hidden />
               </FooterIconLink>
-              <FooterIconLink href="https://t.me/" label="Telegram">
+              <FooterIconLink href="https://t.me/medbazauz_bot" label="Telegram">
                 <Send className="h-4 w-4" aria-hidden />
               </FooterIconLink>
             </div>
