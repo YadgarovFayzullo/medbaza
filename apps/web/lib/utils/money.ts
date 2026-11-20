@@ -82,6 +82,9 @@ export function formatMoneyCompact(
     style: 'currency',
     currency,
     notation: 'compact',
+    // Explicit minimum: a currency with minor units (UZS, USD) otherwise keeps
+    // one forced decimal on older ICU (Node 20 prints "124,0 mln so'm").
+    minimumFractionDigits: 0,
     maximumFractionDigits: 1,
   }).format(fromMinor(amountMinor, currency));
 }
