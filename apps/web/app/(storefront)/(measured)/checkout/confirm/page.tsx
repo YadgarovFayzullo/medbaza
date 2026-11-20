@@ -25,8 +25,9 @@ export default function ConfirmPage({
           </p>
         ) : null}
         <p className="text-sm text-accent/60">
-          Buyurtmadagi har bir sotuvchi alohida jo’natadi va har bir jo’natma alohida kuzatiladi.
-          To’lov o’tishi bilan sizga xat yuboriladi.
+          To’lov hisob-faktura bo’yicha yoki buyurtmani qabul qilishda amalga oshiriladi —
+          menejerimiz siz bilan bog’lanadi. To’lov tasdiqlangach, buyurtma sotuvchilarga yuboriladi;
+          har bir sotuvchi alohida jo’natadi va har bir jo’natma alohida kuzatiladi.
         </p>
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           {searchParams.order ? (

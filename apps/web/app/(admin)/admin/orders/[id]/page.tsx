@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { statusLabel } from '@/components/domain/status-badge';
 import { Alert, Card, CardBody, CardHeader, CardTitle } from '@/components/ui';
+import { AdminConfirmPayment } from '@/features/orders/admin-confirm-payment';
 import { AdminShipmentActions } from '@/features/orders/admin-shipment-actions';
 import { OrderDetail } from '@/features/orders/order-detail';
 import { ApiError } from '@/lib/api-client';
@@ -20,6 +21,10 @@ export default async function AdminOrderPage({ params }: { params: { id: string 
   });
   if (!order) notFound();
 
+  const awaitingPayment = order.shipments.some(
+    (shipment) => shipment.status === 'pending_payment' || shipment.status === 'payment_failed',
+  );
+
   return (
     <div className="space-y-6">
       <Link href="/admin/orders" className="text-sm text-primary-ink hover:underline">
@@ -32,6 +37,17 @@ export default async function AdminOrderPage({ params }: { params: { id: string 
       </Alert>
 
       <OrderDetail order={order} />
+
+      {awaitingPayment ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">To’lovni tasdiqlash</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <AdminConfirmPayment order={order} />
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
